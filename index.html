@@ -1,0 +1,420 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script>
+(function(){
+  var __k="554a053d-539c-4297-abc0-1cbf59e49e9d";
+  var __a=null;
+  var __preload=null;
+  if(!__k)return;
+  var _f=window.fetch;
+  // S3 URL → file_key 추출 후 __a 매핑 lookup → assets/ 로컬 경로 치환
+  // 응답에 새 signed URL이 와도 같은 file_key면 같은 assets/ → 영구 작동
+  function patchUrls(data){
+    if(!__a)return data;
+    try{
+      var s=JSON.stringify(data);
+      // 응답 안의 모든 S3 URL을 정규식으로 찾고, file_key 추출 → 매핑 lookup
+      s=s.replace(/https:\/\/prod-files-secure\.s3\.amazonaws\.com\/[^"\s<>]+/g,function(url){
+        var m=url.match(/\.amazonaws\.com\/([^?\\]+)/);
+        if(!m)return url;
+        var key=m[1].replace(/\\u002F/g,"/");
+        return __a[key]||url;
+      });
+      return JSON.parse(s);
+    }catch(e){return data;}
+  }
+  function callMisiso(method,path,body){
+    return _f("https://misiso.com/api/notion/deploy-proxy",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({deployKey:__k,path:path,method:method,body:body})
+    }).then(function(r){
+      var status=r.status;
+      return r.json().then(function(data){return {status:status,data:patchUrls(data)};});
+    });
+  }
+  // preload pattern — 페이지 로드와 병렬로 정적 fetch 호출 미리 시작
+  var __preloadCache={};
+  if(__preload){
+    for(var i=0;i<__preload.length;i++){
+      (function(c){
+        var key=c.method+":"+c.path+":"+(c.body?JSON.stringify(c.body):"");
+        __preloadCache[key]=callMisiso(c.method,c.path,c.body);
+      })(__preload[i]);
+    }
+  }
+  window.fetch=function(url,opts){
+    var u=typeof url==="string"?url:String(url);
+    if(!u.startsWith("/api/notion/"))return _f.apply(this,arguments);
+    var path=u.slice("/api/notion".length);
+    var method=(opts&&opts.method)||"GET";
+    var body;
+    try{body=opts&&opts.body?JSON.parse(opts.body):undefined;}catch(e){body=opts&&opts.body;}
+    var ck=method+":"+path+":"+(body?JSON.stringify(body):"");
+    var promise=__preloadCache[ck];
+    if(promise){delete __preloadCache[ck];}
+    else{promise=callMisiso(method,path,body);}
+    return promise.then(function(res){
+      return new Response(JSON.stringify(res.data),{
+        status:res.status,
+        headers:{"Content-Type":"application/json"}
+      });
+    });
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://misiso.com" crossorigin/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="초음파 약침 누적 카운팅"/>
+<meta property="og:description" content="소노안산 초음파 약침 누적 카운팅 웹앱입니다."/>
+<title>초음파 약침 누적 카운팅</title>
+<meta name="description" content="소노안산 초음파 약침 누적 카운팅 웹앱입니다."/>
+<meta property="og:image" content="https://Junesight.github.io/sono-count/og-image-00w7cayt.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://Junesight.github.io/sono-count/og-image-00w7cayt.png"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2032%2032'%3E%3Crect%20width%3D'32'%20height%3D'32'%20rx%3D'6'%20fill%3D'%236366f1'%2F%3E%3Ctext%20x%3D'16'%20y%3D'22'%20text-anchor%3D'middle'%20font-size%3D'18'%20fill%3D'white'%20font-family%3D'sans-serif'%3E%EC%B4%88%3C%2Ftext%3E%3C%2Fsvg%3E"/>
+<script src="https://cdn.tailwindcss.com"></script>
+</head><body><!DOCTYPE html>
+<html lang="ko">
+<head>
+
+
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: #f0f2f5;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 { font-size: 2rem; font-weight: 900; color: #1a1a2e; margin-bottom: 4px; }
+  .header .date-display { font-size: 0.95rem; color: #666; }
+  .loading-bar { text-align: center; padding: 40px; color: #888; font-size: 0.95rem; }
+  .overview-wrap {
+    max-width: 1400px; margin: 0 auto 20px; background: #fff;
+    border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto;
+  }
+  .overview-wrap table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  .overview-wrap th { padding: 8px 6px; font-size: 0.78rem; font-weight: 700; text-align: center; white-space: nowrap; }
+  .overview-wrap th.row-label { background: #1a1a2e; color: #fff; text-align: left; padding-left: 12px; width: 70px; font-size: 0.72rem; }
+  .overview-wrap th.name-cell { background: #1a1a2e; color: #fff; }
+  .overview-wrap td { padding: 6px; font-size: 0.85rem; text-align: center; font-weight: 700; color: #333; border-bottom: 1px solid #f0f0f0; }
+  .overview-wrap td.row-label { background: #f8f9fb; font-size: 0.72rem; font-weight: 600; color: #666; text-align: left; padding-left: 12px; white-space: nowrap; }
+  .overview-wrap tr:last-child td { border-bottom: none; }
+  .overview-wrap .closed-text { color: #dc2626; font-weight: 700; font-size: 0.75rem; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 1200px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #fff; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border: 2px solid transparent; position: relative; }
+  .card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); transform: translateY(-1px); }
+  .card.active { border-color: #4a6cf7; }
+  .card-name { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .card-name .icon { font-size: 1.1rem; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .stat-item { background: #f8f9fb; border-radius: 6px; padding: 6px; text-align: center; }
+  .stat-item.total { background: linear-gradient(135deg, #4a6cf7 0%, #6a8cff 100%); color: #fff; grid-column: 1 / -1; }
+  .stat-label { font-size: 0.62rem; color: #888; margin-bottom: 2px; font-weight: 500; }
+  .stat-item.total .stat-label { color: rgba(255,255,255,0.8); }
+  .stat-value { font-size: 1.05rem; font-weight: 800; color: #1a1a2e; }
+  .stat-item.total .stat-value { color: #fff; font-size: 1.2rem; }
+  .input-panel { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
+  .input-panel.show { display: block; }
+  .date-selector { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 0.95rem; color: #444; flex-wrap: wrap; }
+  .date-select { background: #eef1f6; border: none; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; font-weight: 600; color: #4a6cf7; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a6cf7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+  .date-select:hover { background-color: #dde3f0; }
+  .input-row { display: flex; align-items: center; gap: 8px; }
+  .count-input { flex: 1; border: 2px solid #ddd; border-radius: 8px; padding: 8px 10px; font-size: 1rem; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s; -moz-appearance: textfield; }
+  .count-input:focus { border-color: #4a6cf7; }
+  .count-input::-webkit-inner-spin-button, .count-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-save { background: #4a6cf7; color: #fff; }
+  .btn-save:hover { background: #3a5ce5; }
+  .btn-save:disabled { background: #a0b4f7; cursor: not-allowed; }
+  .btn-closed { background: #fee2e2; color: #dc2626; }
+  .btn-closed:hover { background: #fecaca; }
+  .btn-closed.is-closed { background: #dc2626; color: #fff; }
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1a1a2e; color: #fff; padding: 12px 24px; border-radius: 10px; font-size: 0.9rem; font-weight: 500; opacity: 0; transition: all 0.3s ease; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .closed-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 20px; margin-left: auto; }
+  .summary-bar { max-width: 1400px; margin: 0 auto 16px; background: linear-gradient(135deg, #1a1a2e 0%, #2d2d5e 100%); border-radius: 14px; padding: 20px 28px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 12px; }
+  .summary-item { text-align: center; }
+  .summary-item .s-label { font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+  .summary-item .s-value { font-size: 1.5rem; font-weight: 800; color: #fff; }
+  .sync-btn { position: fixed; top: 16px; right: 16px; background: #4a6cf7; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 1.2rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 100; transition: transform 0.3s; }
+  .sync-btn:hover { transform: scale(1.1); }
+  .sync-btn.spinning { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<button class="sync-btn" id="syncBtn" onclick="loadFromServer()" title="새로고침">🔄</button>
+
+<div class="header">
+  <h1>💉 초음파 약침 누적 카운팅</h1>
+  <div class="date-display" id="headerDate"></div>
+</div>
+
+<div class="summary-bar" id="summaryBar"></div>
+<div class="overview-wrap" id="overviewWrap"></div>
+<div class="grid" id="grid"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ⬇️ 여기에 Apps Script 웹 앱 URL을 붙여넣으세요
+var API_URL = 'https://script.google.com/macros/s/AKfycbxTOiDXSFxCWBAKlMb_T1YyUIyezqBzkQUROc9W-27JuX08ySqW7ZlCOp_v8_sHMTbz/exec';
+
+var MEMBERS = ['강솔','강용구','고용희','김영욱','김은정','김준현','박세운','박혜진','왕성민','장현호','최성훈','최우정'];
+var FEMALE = ['강솔','김은정','박세운','박혜진','최우정'];
+function getIcon(m) { return FEMALE.indexOf(m) >= 0 ? '👩‍⚕️' : '👨‍⚕️'; }
+var BASELINE = {'강솔':5452,'강용구':2647,'고용희':385,'김영욱':2296,'김은정':6325,'김준현':2551,'박세운':1036,'박혜진':1124,'왕성민':1870,'장현호':17990,'최성훈':1797,'최우정':2640};
+var MIN_DATE = '2026-05-04';
+function dk(y,m,d) { return y+'-'+(m<10?'0':'')+m+'-'+(d<10?'0':'')+d; }
+function isLocked(y,m,d) { return dk(y,m,d) < MIN_DATE; }
+function getToday() { var n=new Date(); return {y:n.getFullYear(),m:n.getMonth()+1,d:n.getDate()}; }
+function weekOfMonth(y,m,d) { return Math.ceil((d + new Date(y,m-1,1).getDay()) / 7); }
+function dim(y,m) { return new Date(y,m,0).getDate(); }
+
+var DATA = {};
+var activeCard = null;
+var panelState = {};
+var saving = false;
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2000);
+}
+
+// === Google Sheets API ===
+function loadFromServer() {
+  var btn = document.getElementById('syncBtn');
+  btn.classList.add('spinning');
+  fetch(API_URL)
+    .then(function(r) { return r.json(); })
+    .then(function(d) { DATA = d; render(); btn.classList.remove('spinning'); })
+    .catch(function(e) {
+      console.error(e); btn.classList.remove('spinning');
+      showToast('⚠️ 데이터 로드 실패 — 새로고침 버튼을 눌러주세요');
+      render();
+    });
+}
+
+function saveToServer(member, date, value, cb) {
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({member:member, date:date, value:value})
+  }).then(function() {
+    if (!DATA[member]) DATA[member] = {};
+    if (value === null) { delete DATA[member][date]; }
+    else { DATA[member][date] = value; }
+    if (cb) cb(true);
+  }).catch(function(e) {
+    console.error(e); showToast('⚠️ 저장 실패');
+    if (cb) cb(false);
+  });
+}
+
+// === Calculations ===
+function calcTotal(member) {
+  var base = BASELINE[member] || 0;
+  if (!DATA[member]) return base;
+  var sum = 0;
+  for (var k in DATA[member]) { var v = DATA[member][k]; if (typeof v === 'number') sum += v; }
+  return base + sum;
+}
+function calcMonthly(member, y, m) {
+  if (!DATA[member]) return 0;
+  var prefix = dk(y,m,1).substring(0,8);
+  var sum = 0;
+  for (var k in DATA[member]) { if (k.substring(0,8)===prefix && typeof DATA[member][k]==='number') sum += DATA[member][k]; }
+  return sum;
+}
+function calcWeekly(member, y, m, week) {
+  if (!DATA[member]) return 0;
+  var sum = 0;
+  for (var dd=1; dd<=dim(y,m); dd++) {
+    if (weekOfMonth(y,m,dd)===week) { var v=DATA[member][dk(y,m,dd)]; if (typeof v==='number') sum+=v; }
+  }
+  return sum;
+}
+function calcDaily(member, dateKey) {
+  if (!DATA[member]) return 0;
+  var v = DATA[member][dateKey];
+  if (v === 'closed') return '휴진';
+  return typeof v === 'number' ? v : 0;
+}
+
+// === Render ===
+function render() {
+  var t = getToday();
+  var dateKey = dk(t.y, t.m, t.d);
+  var week = weekOfMonth(t.y, t.m, t.d);
+  var dayNames = ['일','월','화','수','목','금','토'];
+  var dow = dayNames[new Date(t.y, t.m-1, t.d).getDay()];
+  document.getElementById('headerDate').textContent = t.y+'년 '+t.m+'월 '+t.d+'일 ('+dow+')';
+
+  var totalAll=0, monthAll=0, weekAll=0, todayAll=0;
+  MEMBERS.forEach(function(m) {
+    totalAll += calcTotal(m);
+    monthAll += calcMonthly(m, t.y, t.m);
+    weekAll += calcWeekly(m, t.y, t.m, week);
+    var dv = calcDaily(m, dateKey);
+    if (typeof dv === 'number') todayAll += dv;
+  });
+
+  document.getElementById('summaryBar').innerHTML =
+    '<div class="summary-item"><div class="s-label">오늘</div><div class="s-value">'+todayAll.toLocaleString()+'</div></div>'+
+    '<div class="summary-item"><div class="s-label">'+t.m+'월 '+week+'주차</div><div class="s-value">'+weekAll.toLocaleString()+'</div></div>'+
+    '<div class="summary-item"><div class="s-label">'+t.m+'월 합계</div><div class="s-value">'+monthAll.toLocaleString()+'</div></div>'+
+    '<div class="summary-item"><div class="s-label">전체 누적</div><div class="s-value">'+totalAll.toLocaleString()+'</div></div>';
+
+  // Overview Table
+  var nameH='<tr><th class="row-label"></th>';
+  var dailyR='<tr><td class="row-label">일간 ('+t.m+'/'+t.d+')</td>';
+  var weeklyR='<tr><td class="row-label">주간 ('+week+'주)</td>';
+  var monthlyR='<tr><td class="row-label">월간 ('+t.m+'월)</td>';
+  var totalR='<tr><td class="row-label">총누적</td>';
+  MEMBERS.forEach(function(member) {
+    var dv=calcDaily(member,dateKey), wv=calcWeekly(member,t.y,t.m,week);
+    var mv=calcMonthly(member,t.y,t.m), tv=calcTotal(member);
+    nameH+='<th class="name-cell">'+member+'</th>';
+    dailyR+='<td>'+(dv==='휴진'?'<span class="closed-text">휴진</span>':dv)+'</td>';
+    weeklyR+='<td>'+wv+'</td>'; monthlyR+='<td>'+mv+'</td>';
+    totalR+='<td style="font-weight:800;color:#4a6cf7">'+tv.toLocaleString()+'</td>';
+  });
+  nameH+='</tr>'; dailyR+='</tr>'; weeklyR+='</tr>'; monthlyR+='</tr>'; totalR+='</tr>';
+  document.getElementById('overviewWrap').innerHTML='<table>'+nameH+dailyR+weeklyR+monthlyR+totalR+'</table>';
+
+  // Cards
+  var grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  MEMBERS.forEach(function(member, idx) {
+    var total=calcTotal(member), monthly=calcMonthly(member,t.y,t.m);
+    var weekly=calcWeekly(member,t.y,t.m,week), daily=calcDaily(member,dateKey);
+    var isClosed = daily==='휴진', isActive = activeCard===idx;
+    var card = document.createElement('div');
+    card.className = 'card'+(isActive?' active':'');
+    card.innerHTML =
+      '<div class="card-name"><span class="icon">'+getIcon(member)+'</span>'+member+'<span style="font-size:0.72rem;font-weight:500;color:#888;margin-left:2px">원장님</span>'+(isClosed?'<span class="closed-badge">오늘 휴진</span>':'')+'</div>'+
+      '<div class="stats">'+
+        '<div class="stat-item total"><div class="stat-label">누적 시술건수</div><div class="stat-value">'+total.toLocaleString()+'</div></div>'+
+        '<div class="stat-item"><div class="stat-label">'+t.m+'월 시술건수</div><div class="stat-value">'+monthly+'</div></div>'+
+        '<div class="stat-item"><div class="stat-label">'+t.m+'월 '+week+'주차</div><div class="stat-value">'+weekly+'</div></div>'+
+        '<div class="stat-item" style="grid-column:1/-1"><div class="stat-label">'+t.m+'월 '+t.d+'일 시술건수</div><div class="stat-value">'+(isClosed?'휴진':(typeof daily==='number'?daily:0))+'</div></div>'+
+      '</div>'+
+      '<div class="input-panel'+(isActive?' show':'')+'" id="panel-'+idx+'">'+
+        '<div class="date-selector"><span>📅</span>'+
+          '<select class="date-select" id="msel-'+idx+'" onclick="event.stopPropagation()" onchange="changeMonth('+idx+',this.value)">'+monthOpts(t.m)+'</select>'+
+          '<select class="date-select" id="dsel-'+idx+'" onclick="event.stopPropagation()" onchange="changeDay('+idx+',this.value)">'+dayOpts(t.m,t.d)+'</select>'+
+          '<span style="font-size:0.85rem;color:#888">시술 건수</span></div>'+
+        '<div class="input-row"><input type="number" min="0" class="count-input" id="input-'+idx+'" placeholder="건수 입력" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\')saveMember('+idx+')"></div>'+
+        '<div class="btn-row"><button class="btn btn-save" id="savebtn-'+idx+'" onclick="event.stopPropagation();saveMember('+idx+')">\ud83d\udcbe 저장</button><button class="btn btn-closed" id="closedbtn-'+idx+'" onclick="event.stopPropagation();toggleClosed('+idx+')">\ud83d\udeab 휴진</button></div>'+
+      '</div>';
+    card.addEventListener('click', (function(i){return function(){toggleCard(i);};})(idx));
+    grid.appendChild(card);
+    if (isActive) setTimeout((function(i){return function(){loadPanel(i);};})(idx), 0);
+  });
+}
+
+function toggleCard(idx) {
+  if (activeCard===idx) { activeCard=null; delete panelState[idx]; }
+  else { activeCard=idx; var t=getToday(); panelState[idx]={m:t.m,d:t.d}; }
+  render();
+}
+
+function loadPanel(idx) {
+  var member=MEMBERS[idx], ps=panelState[idx]; if(!ps) return;
+  var t=getToday(), dateKey=dk(t.y,ps.m,ps.d);
+  var val = DATA[member] ? (DATA[member][dateKey]!=null ? DATA[member][dateKey] : null) : null;
+  var input=document.getElementById('input-'+idx);
+  var closedBtn=document.getElementById('closedbtn-'+idx);
+  if (!input) return;
+  var locked = isLocked(t.y,ps.m,ps.d);
+  if (locked) {
+    input.value=''; input.disabled=true; input.placeholder='수정 불가 (초기데이터)';
+    closedBtn.disabled=true; closedBtn.textContent='🔒 잠김'; closedBtn.style.opacity='0.5';
+  } else if (val==='closed') {
+    input.value=''; input.disabled=true; input.placeholder='휴진';
+    closedBtn.disabled=false; closedBtn.style.opacity='1'; closedBtn.classList.add('is-closed'); closedBtn.textContent='✅ 휴진 해제';
+  } else {
+    input.value = typeof val==='number' ? val : ''; input.disabled=false; input.placeholder='건수 입력';
+    closedBtn.disabled=false; closedBtn.style.opacity='1'; closedBtn.classList.remove('is-closed'); closedBtn.textContent='🚫 휴진';
+  }
+  var msel=document.getElementById('msel-'+idx), dsel=document.getElementById('dsel-'+idx);
+  if(msel) msel.value=ps.m;
+  if(dsel) { dsel.innerHTML=dayOpts(ps.m,ps.d); dsel.value=ps.d; }
+}
+
+function monthOpts(sel) {
+  var h=''; for(var i=1;i<=12;i++) h+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+i+'월</option>'; return h;
+}
+function dayOpts(m,sel) {
+  var d=dim(getToday().y,m), h='';
+  for(var i=1;i<=d;i++) h+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+i+'일</option>'; return h;
+}
+function changeMonth(idx,val) {
+  var ps=panelState[idx]; if(!ps) return;
+  ps.m=parseInt(val,10); var d=dim(getToday().y,ps.m); if(ps.d>d) ps.d=d;
+  var dsel=document.getElementById('dsel-'+idx); if(dsel) dsel.innerHTML=dayOpts(ps.m,ps.d);
+  loadPanel(idx);
+}
+function changeDay(idx,val) {
+  var ps=panelState[idx]; if(!ps) return;
+  ps.d=parseInt(val,10); loadPanel(idx);
+}
+
+function saveMember(idx) {
+  if (saving) return;
+  var member=MEMBERS[idx], ps=panelState[idx]; if(!ps) return;
+  var t=getToday(), dateKey=dk(t.y,ps.m,ps.d);
+  if (isLocked(t.y,ps.m,ps.d)) { showToast('⛔ 5/3 이전 데이터는 수정할 수 없습니다'); return; }
+  var input=document.getElementById('input-'+idx);
+  var val=input.value.trim();
+  var saveBtn=document.getElementById('savebtn-'+idx);
+  if (val==='') {
+    saving=true; saveBtn.disabled=true; saveBtn.textContent='저장 중...';
+    saveToServer(member, dateKey, null, function(ok) {
+      saving=false; saveBtn.disabled=false; saveBtn.textContent='💾 저장';
+      if(ok) { showToast(member+' \u2014 '+ps.m+'월 '+ps.d+'일 기록 삭제'); render(); }
+    });
+  } else {
+    var num=parseInt(val,10);
+    if (isNaN(num)||num<0) { showToast('0 이상의 숫자를 입력해주세요'); return; }
+    saving=true; saveBtn.disabled=true; saveBtn.textContent='저장 중...';
+    saveToServer(member, dateKey, num, function(ok) {
+      saving=false; saveBtn.disabled=false; saveBtn.textContent='💾 저장';
+      if(ok) { showToast(member+' \u2014 '+ps.m+'월 '+ps.d+'일 : '+num+'건 저장 \u2705'); render(); }
+    });
+  }
+}
+
+function toggleClosed(idx) {
+  if (saving) return;
+  var member=MEMBERS[idx], ps=panelState[idx]; if(!ps) return;
+  var t=getToday(), dateKey=dk(t.y,ps.m,ps.d);
+  if (isLocked(t.y,ps.m,ps.d)) { showToast('⛔ 5/3 이전 데이터는 수정할 수 없습니다'); return; }
+  var current = DATA[member] ? DATA[member][dateKey] : null;
+  var newVal = (current==='closed') ? null : 'closed';
+  var msg = (current==='closed') ? member+' \u2014 '+ps.m+'월 '+ps.d+'일 휴진 해제' : member+' \u2014 '+ps.m+'월 '+ps.d+'일 휴진 등록';
+  saving=true;
+  saveToServer(member, dateKey, newVal, function(ok) {
+    saving=false;
+    if(ok) { showToast(msg); render(); }
+  });
+}
+
+// 초기 로드
+render();
+if (API_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') { loadFromServer(); }
+else { showToast('⚠️ API URL을 설정해주세요 (가이드 참고)'); }
+</script>
+</body>
+</html></body></html>
