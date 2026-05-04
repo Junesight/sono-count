@@ -83,9 +83,17 @@
   <div class="date-display" id="headerDate"></div>
 </div>
 
+<div id="loadingScreen" style="text-align:center;padding:80px 20px;">
+  <div style="font-size:2.5rem;margin-bottom:16px;animation:pulse 1.5s infinite">💉</div>
+  <div style="font-size:1rem;font-weight:700;color:#1a1a2e;margin-bottom:8px">데이터 불러오는 중...</div>
+  <div style="font-size:0.8rem;color:#888">잠시만 기다려주세요</div>
+</div>
+<style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}</style>
+<div id="mainContent" style="display:none">
 <div class="summary-bar" id="summaryBar"></div>
 <div class="overview-wrap" id="overviewWrap"></div>
 <div class="grid" id="grid"></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -138,7 +146,11 @@ function loadFromServer() {
   btn.classList.add('spinning');
   fetch(API_URL)
     .then(function(r) { return r.json(); })
-    .then(function(d) { DATA = normalizeData(d); render(); btn.classList.remove('spinning'); })
+    .then(function(d) {
+      DATA = normalizeData(d);
+      if (initialLoad) { initialLoad=false; document.getElementById('loadingScreen').style.display='none'; document.getElementById('mainContent').style.display='block'; }
+      render(); btn.classList.remove('spinning');
+    })
     .catch(function(e) {
       console.error(e); btn.classList.remove('spinning');
       showToast('⚠️ 데이터 로드 실패 — 새로고침 버튼을 눌러주세요');
@@ -356,9 +368,9 @@ function toggleClosed(idx) {
 }
 
 // 초기 로드
-render();
+var initialLoad = true;
 if (API_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') { loadFromServer(); }
-else { showToast('⚠️ API URL을 설정해주세요 (가이드 참고)'); }
+else { document.getElementById('loadingScreen').style.display='none'; document.getElementById('mainContent').style.display='block'; render(); showToast('⚠️ API URL을 설정해주세요 (가이드 참고)'); }
 </script>
 </body>
 </html>
