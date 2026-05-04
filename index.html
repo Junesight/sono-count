@@ -91,13 +91,17 @@
     .card-compact { display: flex; align-items: center; padding: 10px 12px; gap: 6px; }
     .card.active .card-compact { border-bottom: 1px solid #eee; }
     .compact-icon { font-size: 1rem; }
-    .compact-name { font-weight: 700; font-size: 0.88rem; color: #1a1a2e; flex: 1; }
-    .compact-col { text-align: center; min-width: 52px; margin-left: 8px; }
+    .compact-name { font-weight: 700; font-size: 0.88rem; color: #1a1a2e; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .compact-col { text-align: right; margin-left: 10px; flex-shrink: 0; }
+    .compact-col.col-daily { width: 36px; }
+    .compact-col.col-weekly { width: 36px; margin-left: 4px; }
+    .compact-col.col-cumul { width: 52px; }
     .compact-col .c-label { font-size: 0.5rem; color: #999; display: block; line-height: 1; margin-bottom: 1px; }
     .compact-col .c-value { font-size: 0.9rem; font-weight: 800; line-height: 1.2; }
     .compact-col .c-value.daily { color: #4a6cf7; }
     .compact-col .c-value.cumul { color: #1a1a2e; }
     .compact-col .c-value.closed-val { color: #dc2626; font-size: 0.72rem; }
+    .compact-col .c-value.weekly-val { color: #6b7280; }
     .mobile-header { display: flex; padding: 6px 12px; font-size: 0.6rem; font-weight: 600; color: #999; max-width: 1400px; margin: 0 auto 2px; }
     .mobile-header span:first-child { flex: 1; padding-left: 6px; text-align: left; }
     .mobile-header span { text-align: center; min-width: 52px; margin-left: 8px; }
@@ -293,7 +297,7 @@ function render() {
     card.className = 'card'+(isActive?' active':'');
     var dailyDisp = isClosed ? '<span class="c-value closed-val">휴진</span>' : '<span class="c-value daily">'+(typeof daily==='number'?daily:0)+'</span>';
     card.innerHTML =
-      '<div class="card-compact"><span class="compact-icon">'+getIcon(member)+'</span><span class="compact-name">'+member+' <span style="font-size:0.62rem;font-weight:500;color:#888">원장님</span></span><div class="compact-col"><span class="c-label">금일</span>'+dailyDisp+'</div><div class="compact-col"><span class="c-label">누적</span><span class="c-value cumul">'+total.toLocaleString()+'</span></div></div>'+
+      '<div class="card-compact"><span class="compact-icon">'+getIcon(member)+'</span><span class="compact-name">'+member+' <span style="font-size:0.62rem;font-weight:500;color:#888">원장님</span></span><div class="compact-col col-daily"><span class="c-label">금일</span>'+dailyDisp+'</div><div class="compact-col col-weekly"><span class="c-label">주간</span><span class="c-value weekly-val">'+weekly+'</span></div><div class="compact-col col-cumul"><span class="c-label">누적</span><span class="c-value cumul">'+total.toLocaleString()+'</span></div></div>'+
       '<div class="card-name"><span class="icon">'+getIcon(member)+'</span>'+member+'<span style="font-size:0.72rem;font-weight:500;color:#888;margin-left:2px">원장님</span>'+(isClosed?'<span class="closed-badge">오늘 휴진</span>':'')+'</div>'+
       '<div class="stats">'+
         '<div class="stat-item total"><div class="stat-label">누적 시술건수</div><div class="stat-value">'+total.toLocaleString()+'</div></div>'+
