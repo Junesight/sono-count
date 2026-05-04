@@ -72,6 +72,39 @@
   .sync-btn:hover { transform: scale(1.1); }
   .sync-btn.spinning { animation: spin 1s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  /* Mobile compact view */
+  @media (max-width: 600px) {
+    .overview-wrap { display: none !important; }
+    .summary-bar { padding: 10px 16px; border-radius: 10px; margin-bottom: 10px; gap: 6px; }
+    .summary-item .s-label { font-size: 0.62rem; margin-bottom: 1px; }
+    .summary-item .s-value { font-size: 1.1rem; }
+    .header h1 { font-size: 1.4rem; }
+    .header { margin-bottom: 10px; }
+    body { padding: 10px; }
+    .grid { gap: 5px; grid-template-columns: 1fr !important; }
+    .card { padding: 0; border-radius: 8px; }
+    .card-name { display: none !important; }
+    .card:not(.active) .stats { display: none; }
+    .card.active .stats { display: grid; margin: 0 12px; padding-top: 8px; }
+    .card:not(.active) .input-panel { display: none !important; }
+    .card.active .input-panel.show { display: block; margin: 0 12px; padding-bottom: 12px; }
+    .card-compact { display: flex; align-items: center; padding: 10px 12px; gap: 6px; }
+    .card.active .card-compact { border-bottom: 1px solid #eee; }
+    .compact-icon { font-size: 1rem; }
+    .compact-name { font-weight: 700; font-size: 0.88rem; color: #1a1a2e; flex: 1; }
+    .compact-col { text-align: center; min-width: 52px; margin-left: 8px; }
+    .compact-col .c-label { font-size: 0.5rem; color: #999; display: block; line-height: 1; margin-bottom: 1px; }
+    .compact-col .c-value { font-size: 0.9rem; font-weight: 800; line-height: 1.2; }
+    .compact-col .c-value.daily { color: #4a6cf7; }
+    .compact-col .c-value.cumul { color: #1a1a2e; }
+    .compact-col .c-value.closed-val { color: #dc2626; font-size: 0.72rem; }
+    .mobile-header { display: flex; padding: 6px 12px; font-size: 0.6rem; font-weight: 600; color: #999; max-width: 1400px; margin: 0 auto 2px; }
+    .mobile-header span:first-child { flex: 1; padding-left: 6px; text-align: left; }
+    .mobile-header span { text-align: center; min-width: 52px; margin-left: 8px; }
+  }
+  @media (min-width: 601px) {
+    .card-compact, .mobile-header { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -258,7 +291,9 @@ function render() {
     var isClosed = daily==='휴진', isActive = activeCard===idx;
     var card = document.createElement('div');
     card.className = 'card'+(isActive?' active':'');
+    var dailyDisp = isClosed ? '<span class="c-value closed-val">휴진</span>' : '<span class="c-value daily">'+(typeof daily==='number'?daily:0)+'</span>';
     card.innerHTML =
+      '<div class="card-compact"><span class="compact-icon">'+getIcon(member)+'</span><span class="compact-name">'+member+' <span style="font-size:0.62rem;font-weight:500;color:#888">원장님</span></span><div class="compact-col"><span class="c-label">금일</span>'+dailyDisp+'</div><div class="compact-col"><span class="c-label">누적</span><span class="c-value cumul">'+total.toLocaleString()+'</span></div></div>'+
       '<div class="card-name"><span class="icon">'+getIcon(member)+'</span>'+member+'<span style="font-size:0.72rem;font-weight:500;color:#888;margin-left:2px">원장님</span>'+(isClosed?'<span class="closed-badge">오늘 휴진</span>':'')+'</div>'+
       '<div class="stats">'+
         '<div class="stat-item total"><div class="stat-label">누적 시술건수</div><div class="stat-value">'+total.toLocaleString()+'</div></div>'+
