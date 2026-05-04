@@ -69,11 +69,11 @@
 <meta property="og:description" content="소노안산 초음파 약침 누적 카운팅 웹앱입니다."/>
 <title>초음파 약침 누적 카운팅</title>
 <meta name="description" content="소노안산 초음파 약침 누적 카운팅 웹앱입니다."/>
-<meta property="og:image" content="https://Junesight.github.io/sono-count/og-image-00w7cayt.png"/>
+<meta property="og:image" content="https://Junesight.github.io/sono-count/og-image-00jtcz1y.png"/>
 <meta property="og:image:width" content="1200"/>
 <meta property="og:image:height" content="630"/>
 <meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:image" content="https://Junesight.github.io/sono-count/og-image-00w7cayt.png"/>
+<meta name="twitter:image" content="https://Junesight.github.io/sono-count/og-image-00jtcz1y.png"/>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2032%2032'%3E%3Crect%20width%3D'32'%20height%3D'32'%20rx%3D'6'%20fill%3D'%236366f1'%2F%3E%3Ctext%20x%3D'16'%20y%3D'22'%20text-anchor%3D'middle'%20font-size%3D'18'%20fill%3D'white'%20font-family%3D'sans-serif'%3E%EC%B4%88%3C%2Ftext%3E%3C%2Fsvg%3E"/>
 <script src="https://cdn.tailwindcss.com"></script>
 </head><body><!DOCTYPE html>
@@ -208,14 +208,15 @@ function loadFromServer() {
 
 function saveToServer(member, date, value, cb) {
   fetch(API_URL, {
-    method: 'POST', mode: 'no-cors',
-    headers: {'Content-Type':'application/json'},
+    method: 'POST',
+    mode: 'no-cors',
     body: JSON.stringify({member:member, date:date, value:value})
   }).then(function() {
     if (!DATA[member]) DATA[member] = {};
     if (value === null) { delete DATA[member][date]; }
     else { DATA[member][date] = value; }
     if (cb) cb(true);
+    setTimeout(loadFromServer, 1500);
   }).catch(function(e) {
     console.error(e); showToast('⚠️ 저장 실패');
     if (cb) cb(false);
