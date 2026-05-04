@@ -90,7 +90,7 @@
 
 <script>
 // ⬇️ 여기에 Apps Script 웹 앱 URL을 붙여넣으세요
-var API_URL = 'https://script.google.com/macros/s/AKfycbxTOiDXSFxCWBAKlMb_T1YyUIyezqBzkQUROc9W-27JuX08ySqW7ZlCOp_v8_sHMTbz/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbw7klw8JLrDxTpETlNTdbemYtYirBjqZK3MCP2O0dAxvVybXTI7r40ZNCCgCquGCbt7/exec';
 
 var MEMBERS = ['강솔','강용구','고용희','김영욱','김은정','김준현','박세운','박혜진','왕성민','장현호','최성훈','최우정'];
 var FEMALE = ['강솔','김은정','박세운','박혜진','최우정'];
@@ -117,12 +117,28 @@ function showToast(msg) {
 }
 
 // === Google Sheets API ===
+function normalizeData(raw) {
+  var result = {};
+  for (var member in raw) {
+    result[member] = {};
+    for (var key in raw[member]) {
+      var nd = key;
+      if (key.length > 10) {
+        var p = new Date(key);
+        if (!isNaN(p.getTime())) nd = p.getFullYear()+'-'+('0'+(p.getMonth()+1)).slice(-2)+'-'+('0'+p.getDate()).slice(-2);
+      }
+      result[member][nd] = raw[member][key];
+    }
+  }
+  return result;
+}
+
 function loadFromServer() {
   var btn = document.getElementById('syncBtn');
   btn.classList.add('spinning');
   fetch(API_URL)
     .then(function(r) { return r.json(); })
-    .then(function(d) { DATA = d; render(); btn.classList.remove('spinning'); })
+    .then(function(d) { DATA = normalizeData(d); render(); btn.classList.remove('spinning'); })
     .catch(function(e) {
       console.error(e); btn.classList.remove('spinning');
       showToast('⚠️ 데이터 로드 실패 — 새로고침 버튼을 눌러주세요');
