@@ -107,6 +107,8 @@ var FEMALE = ['강솔','김은정','박세운','박혜진','최우정'];
 function getIcon(m) { return FEMALE.indexOf(m) >= 0 ? '👩‍⚕️' : '👨‍⚕️'; }
 var BASELINE = {'강솔':5452,'강용구':2647,'고용희':385,'김영욱':2296,'김은정':6325,'김준현':2551,'박세운':1036,'박혜진':1124,'왕성민':1870,'장현호':17990,'최성훈':1797,'최우정':2640};
 var MIN_DATE = '2026-05-04';
+// 5/1~3 합산 (월간/주간에만 반영, 누적에는 미포함)
+var PRE_MONTH = {'강솔':7,'강용구':19,'장현호':53,'박혜진':4,'최우정':3,'김준현':10,'최성훈':10};
 function dk(y,m,d) { return y+'-'+(m<10?'0':'')+m+'-'+(d<10?'0':'')+d; }
 function isLocked(y,m,d) { return dk(y,m,d) < MIN_DATE; }
 function getToday() { var n=new Date(); return {y:n.getFullYear(),m:n.getMonth()+1,d:n.getDate()}; }
@@ -139,19 +141,21 @@ function loadFromServer() {
 }
 
 function saveToServer(member, date, value, cb) {
-  fetch(API_URL, {
-    method: 'POST', mode: 'no-cors',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({member:member, date:date, value:value})
-  }).then(function() {
-    if (!DATA[member]) DATA[member] = {};
-    if (value === null) { delete DATA[member][date]; }
-    else { DATA[member][date] = value; }
-    if (cb) cb(true);
-  }).catch(function(e) {
-    console.error(e); showToast('⚠️ 저장 실패');
-    if (cb) cb(false);
-  });
+  var v = (value === null) ? 'DELETE' : value;
+  var url = API_URL + '?action=save&member=' + encodeURIComponent(member) + '&date=' + encodeURIComponent(date) + '&value=' + encodeURIComponent(v);
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!DATA[member]) DATA[member] = {};
+      if (value === null) { delete DATA[member][date]; }
+      else { DATA[member][date] = value; }
+      if (cb) cb(true);
+      setTimeout(loadFromServer, 1000);
+    })
+    .catch(function(e) {
+      console.error(e); showToast('⚠️ 저장 실패');
+      if (cb) cb(false);
+    });
 }
 
 // === Calculations ===
@@ -163,15 +167,17 @@ function calcTotal(member) {
   return base + sum;
 }
 function calcMonthly(member, y, m) {
-  if (!DATA[member]) return 0;
-  var prefix = dk(y,m,1).substring(0,8);
   var sum = 0;
+  if (y===2026 && m===5 && PRE_MONTH[member]) sum += PRE_MONTH[member];
+  if (!DATA[member]) return sum;
+  var prefix = dk(y,m,1).substring(0,8);
   for (var k in DATA[member]) { if (k.substring(0,8)===prefix && typeof DATA[member][k]==='number') sum += DATA[member][k]; }
   return sum;
 }
 function calcWeekly(member, y, m, week) {
-  if (!DATA[member]) return 0;
   var sum = 0;
+  if (y===2026 && m===5 && week===1 && PRE_MONTH[member]) sum += PRE_MONTH[member];
+  if (!DATA[member]) return sum;
   for (var dd=1; dd<=dim(y,m); dd++) {
     if (weekOfMonth(y,m,dd)===week) { var v=DATA[member][dk(y,m,dd)]; if (typeof v==='number') sum+=v; }
   }
